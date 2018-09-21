@@ -1,0 +1,19 @@
+{
+    "name": "globomap-graphql",
+    "version": "1.0.0",
+    "description": "GraphQL Foxx GloboMap",
+    "main": "index.js",
+    "directories": {
+        "test": "test"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.globoi.com/globocom/globomap-graphql"
+    },
+    "keywords": [],
+    "author": "Ederson Brilhante",
+    "license": "Apache 2",
+    "dependencies": {
+        "graphql": "^14.0.2"
+    }
+}
