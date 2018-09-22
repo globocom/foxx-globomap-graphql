@@ -8,5 +8,12 @@
   "author": "Ederson Brilhante",
   "license": "Apache-2.0",
   "main": "index.js",
-  "tests": "test/**/*.js"
+  "tests": "test/**/*.js",
+  "configuration": {
+    "url": {
+      "description": "Gitter webhook URL.",
+      "type": "string",
+      "default": "http://globomap_api:5000/v2/auth/roles/"
+    }
+  }
 }

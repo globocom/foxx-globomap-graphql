@@ -2,6 +2,7 @@
 
 const gql = require('graphql-sync');
 const GraphQLJSON = require('./graphql-type-json');
+const request = require("@arangodb/request");
 
 const db = require('@arangodb').db;
 const aql = require('@arangodb').aql;
@@ -35,6 +36,29 @@ FOR c in meta_collection
   }
 `).toArray()
 
+function validateToken(context){
+  let token = context.headers.token
+  const response = request.get(
+    context.authUrl,
+    { headers: { 'Authorization': 'Token token=' + token } }
+  );
+  if(response.status == 401){
+    throw new Error('Unauthorized.');
+  } 
+  else{
+    if(response.status != 200){
+      throw new Error('Authentication failed.');
+    } 
+    else{
+      let roles = ['globomap_edge', 'globomap_collection', 'globomap_read']
+      let res = JSON.parse(response.body)
+      if (res.roles.filter((role) => (roles.indexOf(role.name) != -1)).length != 3){
+        throw new Error('Forbidden.');
+      }
+    }
+  }
+}
+
 
 function getQuery(collection, args) {
     let filters = Object.keys(args).map((key) => {
@@ -44,7 +68,6 @@ function getQuery(collection, args) {
     if (filters.length > 0)
         where = ` FILTER ${filters}`
     let query = `FOR c in ${collection} ${where} RETURN c`
-    console.error(query)
     let queryCollection = db._query(query).toArray()
     if (queryCollection.length > 0)
         return queryCollection[0]
@@ -59,7 +82,6 @@ function getLink(collection, args) {
     if (filters.length > 0)
         where = ` FILTER ${filters}`
     let query = `FOR c in ${collection} ${where} RETURN c`
-    console.error(query)
     let queryCollection = db._query(query).toArray()
     return queryCollection
 }
@@ -151,7 +173,6 @@ let CollectionList = function () {
                                 else
                                     args['_to'] = root._id
                             }
-                            console.error(args)
                             delete args.direction
                             let res = getLink(edge, args)
                             return res
@@ -274,7 +295,8 @@ let GetQueryType = function () {
                 fields_coll[name] = {
                     type: collectionType[name],
                     args: commonFields,
-                    resolve(root, args) {
+                    resolve(root, args, context) {
+                        validateToken(context)
                         let res = getQuery(name, args)
                         return res
                     }
@@ -286,7 +308,8 @@ let GetQueryType = function () {
                 fields_coll[name] = {
                     type: edgeType[name],
                     args: args,
-                    resolve(root, args) {
+                    resolve(root, args, context) {
+                        validateToken(context)
                         let res = getQuery(name, args)
                         return res
                     }
