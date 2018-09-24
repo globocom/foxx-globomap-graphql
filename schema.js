@@ -2,88 +2,30 @@
 
 const gql = require('graphql-sync');
 const GraphQLJSON = require('./graphql-type-json');
-const request = require("@arangodb/request");
 
-const db = require('@arangodb').db;
-const aql = require('@arangodb').aql;
+const validateToken = require('./token').validateToken;
+const edgeList = require('./database').edgeList
+const collectionList = require('./database').collectionList
+const getQuery = require('./database').getQuery
+const getLink = require('./database').getLink
 
-const edgeList = db._query(aql`
-FOR g IN meta_graph
-  FOR l in g.links
-    FOR e in meta_collection
-      FILTER e.name == l.edge AND e.kind == 'edge'
-      SORT e.name ASC
-      RETURN {
-        'edge': e,
-        'from_collections': l.from_collections,
-        'to_collections': l.to_collections
-      }
-`).toArray()
-
-const collectionList = db._query(aql`
-FOR c in meta_collection
-  FILTER c.kind == 'document'
-  LET edges = (
-    FOR g IN meta_graph
-      FOR l in g.links
-        FILTER c.name in l.from_collections or c.name in l.to_collections
-          RETURN l.edge
-  )
-  SORT c.name ASC
-  RETURN {
-    'collection': c,
-    'edges': edges
-  }
-`).toArray()
-
-function validateToken(context){
-  let token = context.headers.token
-  const response = request.get(
-    context.authUrl,
-    { headers: { 'Authorization': 'Token token=' + token } }
-  );
-  if(response.status == 401){
-    throw new Error('Unauthorized.');
-  } 
-  else{
-    if(response.status != 200){
-      throw new Error('Authentication failed.');
-    } 
-    else{
-      let roles = ['globomap_edge', 'globomap_collection', 'globomap_read']
-      let res = JSON.parse(response.body)
-      if (res.roles.filter((role) => (roles.indexOf(role.name) != -1)).length != 3){
-        throw new Error('Forbidden.');
-      }
+let collectionSearch = {
+    id: {
+        type: gql.GraphQLString,
+        description: 'The id of the document.'
+    },
+    name: {
+        type: gql.GraphQLString,
+        description: 'The name of the document.'
+    },
+    provider: {
+        type: gql.GraphQLString,
+        description: 'The provider of the document.'
+    },
+    timestamp: {
+        type: gql.GraphQLString,
+        description: 'The timestamp of the document.'
     }
-  }
-}
-
-
-function getQuery(collection, args) {
-    let filters = Object.keys(args).map((key) => {
-        return `c.${key} == '${args[key]}'`
-    }).join(' AND ')
-    let where = ''
-    if (filters.length > 0)
-        where = ` FILTER ${filters}`
-    let query = `FOR c in ${collection} ${where} RETURN c`
-    let queryCollection = db._query(query).toArray()
-    if (queryCollection.length > 0)
-        return queryCollection[0]
-    return null
-}
-
-function getLink(collection, args) {
-    let filters = Object.keys(args).map((key) => {
-        return `c.${key} == '${args[key]}'`
-    }).join(' AND ')
-    let where = ''
-    if (filters.length > 0)
-        where = ` FILTER ${filters}`
-    let query = `FOR c in ${collection} ${where} RETURN c`
-    let queryCollection = db._query(query).toArray()
-    return queryCollection
 }
 
 let commonFields = {
@@ -113,17 +55,6 @@ let commonFields = {
     }
 }
 
-let edgeFields = {
-    to: {
-        type: null,
-        description: 'The destination of the document.'
-    },
-    from: {
-        type: null,
-        description: 'The source of the document.'
-    }
-}
-
 let edgeType = new Object()
 let collectionType = new Object()
 
@@ -132,7 +63,7 @@ const directionType = new gql.GraphQLEnumType({
     description: 'Directions of edges.',
     values: {
         FROM: {
-            value: 'from', // The internal value stored in ArangoDB
+            value: 'from',
             description: 'From'
         },
         TO: {
@@ -161,7 +92,7 @@ let CollectionList = function () {
                 let fields = Object.assign({}, commonFields)
 
                 coll.edges.forEach((edge) => {
-                    let args = Object.assign({}, commonFields, edgeSearch)
+                    let args = Object.assign({}, collectionSearch, edgeSearch)
                     fields[edge] = {
                         description: 'Link:' + edge,
                         type: new gql.GraphQLList(edgeType[edge]),
@@ -182,7 +113,7 @@ let CollectionList = function () {
 
                 return fields
             },
-            args: commonFields,
+            args: collectionSearch,
             resolve(root, args) {
                 let res = getQuery(name, args)
                 return res
@@ -243,7 +174,7 @@ let GetFromType = function (edge) {
             edge.from_collections.forEach((coll) => {
                 fields_coll[coll] = {
                     type: collectionType[coll],
-                    args: commonFields,
+                    args: collectionSearch,
                     resolve(root, args) {
                         args['_id'] = root._from
                         let res = getQuery(coll, args)
@@ -270,7 +201,7 @@ let GetToType = function (edge) {
             edge.to_collections.forEach((coll) => {
                 fields_coll[coll] = {
                     type: collectionType[coll],
-                    args: commonFields,
+                    args: collectionSearch,
                     resolve(root, args) {
                         args['_id'] = root._to
                         let res = getQuery(coll, args)
@@ -294,7 +225,7 @@ let GetQueryType = function () {
             Object.keys(collectionType).map((name) => {
                 fields_coll[name] = {
                     type: collectionType[name],
-                    args: commonFields,
+                    args: collectionSearch,
                     resolve(root, args, context) {
                         validateToken(context)
                         let res = getQuery(name, args)
@@ -304,7 +235,7 @@ let GetQueryType = function () {
             })
             Object.keys(edgeType).map((name) => {
 
-                let args = Object.assign({}, commonFields, edgeSearch)
+                let args = Object.assign({}, collectionSearch, edgeSearch)
                 fields_coll[name] = {
                     type: edgeType[name],
                     args: args,
