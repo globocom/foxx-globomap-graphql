@@ -8,11 +8,23 @@ FOR g IN meta_graph
   FOR l in g.links
     FOR e in meta_collection
       FILTER e.name == l.edge AND e.kind == 'edge'
+      LET from = (
+        FOR f in l.from_collections
+          FOR c in meta_collection
+            FILTER f == c.name
+            RETURN c
+      )
+      LET to = (
+        FOR t in l.to_collections
+          FOR c in meta_collection
+            FILTER t == c.name
+              RETURN c
+      )
       SORT e.name ASC
       RETURN {
         'edge': e,
-        'from_collections': l.from_collections,
-        'to_collections': l.to_collections
+        'from_collections': from,
+        'to_collections': to
       }
 `).toArray()
 
@@ -23,7 +35,9 @@ FOR c in meta_collection
     FOR g IN meta_graph
       FOR l in g.links
         FILTER c.name in l.from_collections or c.name in l.to_collections
-          RETURN l.edge
+        FOR e in meta_collection
+          FILTER e.name == l.edge
+          RETURN e
   )
   SORT c.name ASC
   RETURN {
@@ -66,12 +80,9 @@ function getList(collection, args) {
     return queryCollection
 }
 
-
-
 module.exports = {
     edgeList: edgeList,
     collectionList: collectionList,
     getObject: getObject,
     getList: getList
 }
-

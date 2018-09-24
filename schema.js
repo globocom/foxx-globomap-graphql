@@ -51,7 +51,7 @@ let commonFields = {
     },
     properties_metadata: {
         type: GraphQLJSON,
-        description: 'The properties_metadata of the document.'
+        description: 'The properties metadata of the document.'
     }
 }
 
@@ -97,9 +97,9 @@ let CollectionList = function () {
 
                 coll.edges.forEach((edge) => {
                     let args = Object.assign({}, collectionSearch, edgeSearch)
-                    fields[edge] = {
-                        description: 'Link:' + edge,
-                        type: new gql.GraphQLList(edgeType[edge]),
+                    fields[edge.name] = {
+                        description: edge.alias,
+                        type: new gql.GraphQLList(edgeType[edge.name]),
                         args: args,
                         resolve(root, args) {
                           let res
@@ -111,15 +111,15 @@ let CollectionList = function () {
                                   args['_to'] = root._id
                                 }
                               delete args.direction
-                              res = getList(edge, args)
+                              res = getList(edge.name, args)
                             }
                             else{
                               args['_to'] = root._id
-                              let res1 = getList(edge, args)
+                              let res1 = getList(edge.name, args)
                               delete args._to
                               
                               args['_from'] = root._id
-                              let res2 = getList(edge, args)
+                              let res2 = getList(edge.name, args)
                               
                               res = res1.concat(res2)
                             }
@@ -189,12 +189,13 @@ let GetFromType = function (edge) {
                 }
             }
             edge.from_collections.forEach((coll) => {
-                fields_coll[coll] = {
-                    type: collectionType[coll],
+                fields_coll[coll.name] = {
+                    description: coll.alias,
+                    type: collectionType[coll.name],
                     args: collectionSearch,
                     resolve(root, args) {
                         args['_id'] = root._from
-                        let res = getObject(coll, args)
+                        let res = getObject(coll.name, args)
                         return res
                     }
                 }
@@ -216,12 +217,13 @@ let GetToType = function (edge) {
                 }
             }
             edge.to_collections.forEach((coll) => {
-                fields_coll[coll] = {
-                    type: collectionType[coll],
+                fields_coll[coll.name] = {
+                    description: coll.alias,
+                    type: collectionType[coll.name],
                     args: collectionSearch,
                     resolve(root, args) {
                         args['_id'] = root._to
-                        let res = getObject(coll, args)
+                        let res = getObject(coll.name, args)
                         return res
                     }
                 }
