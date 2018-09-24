@@ -6,8 +6,8 @@ const GraphQLJSON = require('./graphql-type-json');
 const validateToken = require('./token').validateToken;
 const edgeList = require('./database').edgeList
 const collectionList = require('./database').collectionList
-const getQuery = require('./database').getQuery
-const getLink = require('./database').getLink
+const getObject = require('./database').getObject
+const getList = require('./database').getList
 
 let collectionSearch = {
     id: {
@@ -30,7 +30,7 @@ let collectionSearch = {
 
 let commonFields = {
     id: {
-        type: gql.GraphQLString,
+        type: new gql.GraphQLNonNull(gql.GraphQLString),
         description: 'The id of the document.'
     },
     name: {
@@ -80,13 +80,17 @@ let edgeSearch = {
     }
 }
 
+let getAlias = function(name){
+    let alias = name.replace(/(^|_)./g, s => s.slice(-1).toUpperCase())
+    return alias
+}
 
 let CollectionList = function () {
     collectionList.forEach((coll) => {
         let name = coll.collection.name
 
         collectionType[name] = new gql.GraphQLObjectType({
-            name: name,
+            name: getAlias(name),
             description: coll.collection.alias,
             fields: () => {
                 let fields = Object.assign({}, commonFields)
@@ -98,14 +102,27 @@ let CollectionList = function () {
                         type: new gql.GraphQLList(edgeType[edge]),
                         args: args,
                         resolve(root, args) {
+                          let res
                             if (args.direction != undefined) {
-                                if (args.direction == 'from')
-                                    args['_from'] = root._id
-                                else
-                                    args['_to'] = root._id
+                                if (args.direction == 'from'){
+                                  args['_from'] = root._id
+                                }
+                                else{
+                                  args['_to'] = root._id
+                                }
+                              delete args.direction
+                              res = getList(edge, args)
                             }
-                            delete args.direction
-                            let res = getLink(edge, args)
+                            else{
+                              args['_to'] = root._id
+                              let res1 = getList(edge, args)
+                              delete args._to
+                              
+                              args['_from'] = root._id
+                              let res2 = getList(edge, args)
+                              
+                              res = res1.concat(res2)
+                            }
                             return res
                         }
                     }
@@ -115,7 +132,7 @@ let CollectionList = function () {
             },
             args: collectionSearch,
             resolve(root, args) {
-                let res = getQuery(name, args)
+                let res = getObject(name, args)
                 return res
             }
         });
@@ -124,7 +141,7 @@ let CollectionList = function () {
         let name = edge.edge.name
 
         edgeType[name] = new gql.GraphQLObjectType({
-            name: name,
+            name: getAlias(name),
             description: edge.edge.alias,
             fields: () => {
                 let fields = Object.assign({}, commonFields)
@@ -147,7 +164,7 @@ let CollectionList = function () {
                 return fields
             },
             resolve(root, args) {
-                let res = getQuery(name, args)
+                let res = getObject(name, args)
                 return res
             },
             args: {
@@ -162,7 +179,7 @@ let CollectionList = function () {
 
 let GetFromType = function (edge) {
     let directionType = new gql.GraphQLObjectType({
-        name: edge.edge.name + '_from',
+        name: getAlias(edge.edge.name + '_from'),
         fields: () => {
             let fields_coll = new Object()
             fields_coll['id'] = {
@@ -177,7 +194,7 @@ let GetFromType = function (edge) {
                     args: collectionSearch,
                     resolve(root, args) {
                         args['_id'] = root._from
-                        let res = getQuery(coll, args)
+                        let res = getObject(coll, args)
                         return res
                     }
                 }
@@ -189,7 +206,7 @@ let GetFromType = function (edge) {
 }
 let GetToType = function (edge) {
     let directionType = new gql.GraphQLObjectType({
-        name: edge.edge.name + '_to',
+        name: getAlias(edge.edge.name + '_to'),
         fields: () => {
             let fields_coll = new Object()
             fields_coll['id'] = {
@@ -204,7 +221,7 @@ let GetToType = function (edge) {
                     args: collectionSearch,
                     resolve(root, args) {
                         args['_id'] = root._to
-                        let res = getQuery(coll, args)
+                        let res = getObject(coll, args)
                         return res
                     }
                 }
@@ -218,30 +235,32 @@ let GetToType = function (edge) {
 let GetQueryType = function () {
     CollectionList()
     let queryType = new gql.GraphQLObjectType({
-        name: 'Query',
-        description: 'Query',
+        name: 'query',
+        description: 'Query GloboMap',
         fields: () => {
             let fields_coll = new Object()
+            
+            // All Collections
             Object.keys(collectionType).map((name) => {
                 fields_coll[name] = {
                     type: collectionType[name],
                     args: collectionSearch,
                     resolve(root, args, context) {
                         validateToken(context)
-                        let res = getQuery(name, args)
+                        let res = getObject(name, args)
                         return res
                     }
                 }
             })
+            // All Edges
             Object.keys(edgeType).map((name) => {
-
-                let args = Object.assign({}, collectionSearch, edgeSearch)
+                let args = Object.assign({}, collectionSearch)
                 fields_coll[name] = {
                     type: edgeType[name],
                     args: args,
                     resolve(root, args, context) {
                         validateToken(context)
-                        let res = getQuery(name, args)
+                        let res = getObject(name, args)
                         return res
                     }
                 }

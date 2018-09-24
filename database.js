@@ -32,7 +32,7 @@ FOR c in meta_collection
   }
 `).toArray()
 
-function getQuery(collection, args) {
+function getObject(collection, args) {
     let filters = Object.keys(args).map((key) => {
         return `c.${key} == '${args[key]}'`
     }).join(' AND ')
@@ -41,12 +41,20 @@ function getQuery(collection, args) {
         where = ` FILTER ${filters}`
     let query = `FOR c in ${collection} ${where} RETURN c`
     let queryCollection = db._query(query).toArray()
-    if (queryCollection.length > 0)
-        return queryCollection[0]
-    return null
+    if (queryCollection.length > 1){
+        throw "Must be more specific. Many results was returned"
+    } 
+    else {        
+        if (queryCollection.length == 0){
+            return null
+        }
+        else{
+            return queryCollection[0]        
+        }
+    }
 }
 
-function getLink(collection, args) {
+function getList(collection, args) {
     let filters = Object.keys(args).map((key) => {
         return `c.${key} == '${args[key]}'`
     }).join(' AND ')
@@ -63,7 +71,7 @@ function getLink(collection, args) {
 module.exports = {
     edgeList: edgeList,
     collectionList: collectionList,
-    getQuery: getQuery,
-    getLink: getLink
+    getObject: getObject,
+    getList: getList
 }
 
