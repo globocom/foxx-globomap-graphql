@@ -1,6 +1,6 @@
 {
   "name": "globomap-graphql",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "GraphQL Foxx GloboMap",
   "engines": {
     "arangodb": "^3.2.0"

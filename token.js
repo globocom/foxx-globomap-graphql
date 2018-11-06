@@ -17,7 +17,7 @@ function validateToken(context) {
         else {
             let roles = ['globomap_read']
             let res = JSON.parse(response.body)
-            if (res.roles.filter((role) => (roles.indexOf(role.name) != -1)).length != 3) {
+            if (res.roles.filter((role) => (roles.indexOf(role.name) != -1)).length != roles.length) {
                 throw new Error('Forbidden.');
             }
         }
