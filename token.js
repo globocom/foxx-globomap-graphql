@@ -15,7 +15,7 @@ function validateToken(context) {
             throw new Error('Authentication failed.');
         }
         else {
-            let roles = ['globomap_edge', 'globomap_collection', 'globomap_read']
+            let roles = ['globomap_read']
             let res = JSON.parse(response.body)
             if (res.roles.filter((role) => (roles.indexOf(role.name) != -1)).length != 3) {
                 throw new Error('Forbidden.');
